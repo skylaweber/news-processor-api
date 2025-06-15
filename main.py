@@ -37,7 +37,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # In production, replace with specific origins
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
 )
 
@@ -413,6 +413,17 @@ async def get_job_status(job_id: str):
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+# Add HEAD method support for health check
+@app.head("/")
+async def root_head():
+    """HEAD method for root endpoint"""
+    return {}
+
+@app.head("/health")
+async def health_head():
+    """HEAD method for health endpoint"""
+    return {}
 
 @app.get("/")
 async def root():
