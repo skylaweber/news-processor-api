@@ -11,33 +11,19 @@ import os
 import hashlib
 import json
 from functools import lru_cache
-import redis.asyncio as aioredis
 from contextlib import asynccontextmanager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global variables for Redis cache
-redis_client = None
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    global redis_client
-    try:
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-        redis_client = await aioredis.from_url(redis_url, decode_responses=True)
-        logger.info("Connected to Redis cache")
-    except Exception as e:
-        logger.warning(f"Redis not available, using in-memory cache: {e}")
-        redis_client = None
-    
+    logger.info("News Processor API starting up...")
     yield
-    
     # Shutdown
-    if redis_client:
-        await redis_client.close()
+    logger.info("News Processor API shutting down...")
 
 app = FastAPI(
     title="News Processor API", 
@@ -69,7 +55,7 @@ class NewsResponse(BaseModel):
     input_type: str
     extracted_facts: Optional[str] = None
     verified_facts: Optional[str] = None
-    cached: bool = False  # Indicates if result was from cache
+    cached: bool = False  # Always False without Redis
     job_id: Optional[str] = None  # For async processing
 
 class WebhookPayload(BaseModel):
@@ -87,36 +73,6 @@ class NewsProcessor:
     def __init__(self):
         self.firecrawl_api_key = os.getenv("FIRECRAWL_API_KEY")
         self.brave_api_key = os.getenv("BRAVE_API_KEY")
-        self.cache_ttl = int(os.getenv("CACHE_TTL_HOURS", "24")) * 3600  # 24 hours default
-    
-    def _get_cache_key(self, url: str = None, topic: str = None) -> str:
-        """Generate cache key for URL or topic"""
-        content = url or topic
-        return f"news_processor:{hashlib.md5(content.encode()).hexdigest()}"
-    
-    async def _get_from_cache(self, cache_key: str) -> Optional[Dict]:
-        """Get result from cache"""
-        try:
-            if redis_client:
-                cached = await redis_client.get(cache_key)
-                if cached:
-                    return json.loads(cached)
-            return None
-        except Exception as e:
-            logger.warning(f"Cache read error: {e}")
-            return None
-    
-    async def _save_to_cache(self, cache_key: str, result: Dict):
-        """Save result to cache"""
-        try:
-            if redis_client:
-                await redis_client.setex(
-                    cache_key, 
-                    self.cache_ttl, 
-                    json.dumps(result, default=str)
-                )
-        except Exception as e:
-            logger.warning(f"Cache write error: {e}")
     
     async def _send_webhook(self, webhook_url: str, payload: WebhookPayload):
         """Send webhook notification"""
@@ -277,23 +233,11 @@ Provide: 5 SEO titles (60 chars), 5 meta descriptions (130 chars), 5 relevant ke
             raise HTTPException(status_code=500, detail=f"Failed to generate SEO: {str(e)}")
 
     async def process_news_pipeline(self, request: NewsRequest, job_id: str = None) -> NewsResponse:
-        """Main processing pipeline with caching"""
+        """Main processing pipeline"""
         start_time = datetime.now()
         
-        # Check cache first
-        cache_key = self._get_cache_key(request.url, request.topic)
-        cached_result = await self._get_from_cache(cache_key)
-        
-        if cached_result:
-            logger.info(f"Cache hit for {request.url or request.topic}")
-            cached_result["cached"] = True
-            cached_result["processing_time"] = 0.1  # Minimal cache retrieval time
-            if job_id:
-                cached_result["job_id"] = job_id
-            return NewsResponse(**cached_result)
-        
-        # Process fresh content
-        logger.info(f"Cache miss, processing {'URL' if request.url else 'topic'}: {request.url or request.topic}")
+        # Process content (no caching for now)
+        logger.info(f"Processing {'URL' if request.url else 'topic'}: {request.url or request.topic}")
         
         if request.url:
             content = await self.scrape_url(request.url)
@@ -327,24 +271,21 @@ Provide: 5 SEO titles (60 chars), 5 meta descriptions (130 chars), 5 relevant ke
         
         processing_time = (datetime.now() - start_time).total_seconds()
         
-        result = {
-            "success": True,
-            "article": article,
-            "seo": seo,
-            "models_used": "GPT-4.1 (facts + SEO), o3-mini (verification), Claude Sonnet 4 (writing)",
-            "processing_time": processing_time,
-            "input_type": input_type,
-            "extracted_facts": extracted_facts,
-            "verified_facts": verified_facts,
-            "cached": False,
-            "job_id": job_id
-        }
-        
-        # Cache the result
-        await self._save_to_cache(cache_key, result)
+        result = NewsResponse(
+            success=True,
+            article=article,
+            seo=seo,
+            models_used="GPT-4.1 (facts + SEO), o3-mini (verification), Claude Sonnet 4 (writing)",
+            processing_time=processing_time,
+            input_type=input_type,
+            extracted_facts=extracted_facts,
+            verified_facts=verified_facts,
+            cached=False,
+            job_id=job_id
+        )
         
         logger.info(f"Pipeline completed in {processing_time:.2f} seconds")
-        return NewsResponse(**result)
+        return result
 
 # Initialize processor
 processor = NewsProcessor()
@@ -478,10 +419,9 @@ async def root():
             "docs": "/docs"
         },
         "features": [
-            "Smart caching (24hr default)",
-            "Async processing with webhooks", 
             "Multi-model AI pipeline",
-            "Redis cache support",
+            "Async processing with webhooks", 
+            "Content validation",
             "Comprehensive logging"
         ]
     }
