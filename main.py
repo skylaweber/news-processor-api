@@ -67,7 +67,7 @@ class WebhookPayload(BaseModel):
 
 # Initialize AI clients
 openai_client = openai.AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-anthropic_client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+claude_client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 class NewsProcessor:
     def __init__(self):
@@ -189,7 +189,7 @@ Facts to verify: {facts}"""
     async def write_article_claude(self, verified_facts: str) -> str:
         """Write article using Claude Sonnet 4"""
         try:
-            message = await anthropic_client.messages.create(
+            message = await claude_client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=2000,
                 temperature=0.3,
