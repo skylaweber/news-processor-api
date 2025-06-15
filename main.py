@@ -189,8 +189,8 @@ Facts to verify: {facts}"""
     async def write_article_claude(self, verified_facts: str) -> str:
         """Write article using Claude Sonnet 4"""
         try:
-            response = await anthropic_client.messages.create(
-                model="claude-sonnet-4-20250514",
+            message = await anthropic_client.messages.create(
+                model="claude-3-5-sonnet-20241022",
                 max_tokens=2000,
                 temperature=0.3,
                 messages=[
@@ -204,7 +204,7 @@ Requirements: 300-400 words, lead paragraph with most newsworthy fact, inverted 
                     }
                 ]
             )
-            return response.content[0].text
+            return message.content[0].text
         except Exception as e:
             logger.error(f"Error in Claude article writing: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to write article: {str(e)}")
