@@ -13,7 +13,7 @@ AI-powered news processing pipeline that converts URLs or topics into profession
 
 1. **Install dependencies:**
 ```bash
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 2. **Set environment variables:**
@@ -24,7 +24,7 @@ cp .env.example .env
 
 3. **Run locally:**
 ```bash
-python main.py
+python3 main.py
 ```
 
 4. **Test the API:**
@@ -74,13 +74,15 @@ POST /webhook/news-processor
 
 ## Deployment
 
-### Railway (Recommended)
-1. Connect this GitHub repo to Railway
-2. Add environment variables in Railway dashboard
-3. Deploy automatically on git push
+### Render (Recommended - Free Tier)
+1. Connect this GitHub repo to Render
+2. **Build Command:** `pip3 install -r requirements.txt`
+3. **Start Command:** `python3 -m uvicorn main:app --host 0.0.0.0 --port $PORT`
+4. Add environment variables in Render dashboard
+5. Deploy automatically on git push to main
 
-### Other Platforms
-Works on Vercel, Render, Fly.io, or any platform supporting FastAPI.
+### Railway/Vercel/Fly.io
+Also supported - adjust build commands to use `python3` and `pip3`.
 
 ## Response Format
 
